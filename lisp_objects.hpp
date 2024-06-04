@@ -5,6 +5,8 @@
 #include <stack>
 using namespace std;
 
+class EvalApply;
+
 enum objType {
     AS_INT,
     AS_REAL,
@@ -20,7 +22,7 @@ vector<string> typeSty = { "AS_INT", "AS_REAL", "AS_SYMBOL", "AS_BOOL", "AS_BINN
 
 class List;
 struct Binding;
-struct Procedure;
+struct Function;
 
 struct Object {
     objType type;
@@ -31,7 +33,7 @@ struct Object {
         string* strVal;
         List* listVal;
         Binding* bindingVal;
-        Procedure* procedureVal;
+        Function* procedureVal;
     };
 };
 bool compareObject(Object* lhs, Object* rhs);
@@ -70,7 +72,7 @@ Object* makeListObject(List* value) {
     return obj;
 }
 
-Object* makeFunctionObject(Procedure* proc) {
+Object* makeFunctionObject(Function* proc) {
     Object* obj = new Object;
     obj->type = AS_FUNCTION;
     obj->procedureVal = proc;
@@ -162,7 +164,7 @@ class List {
             List* nl = new List();
             ListNode* it = head->next;
             for (; it != nullptr; it = it->next) {
-                cout<<"Appending "<<toString(it->info)<<" of type "<<typeSty[it->info->type]<<endl;
+                //cout<<"Appending "<<toString(it->info)<<" of type "<<typeSty[it->info->type]<<endl;
                 nl->append(it->info);
             }
             return nl;
@@ -179,7 +181,6 @@ class List {
             for (link it = head; it != nullptr; it = it->next, i++)
                 if (compareObject(it->info, obj))
                     return i;
-            cout<<"Didnt find "<<toString(obj)<<endl;
             return -1;
         }
         link getNthNode(int N) {
@@ -191,7 +192,6 @@ class List {
         void addMissing(List* list) {
             for (link it = list->first(); it != nullptr; it = it->next) {
                 if (find(it->info) == -1) {
-                    cout<<"Adding: "<<toString(it->info)<<endl;
                     append(it->info);
                 }
             }
@@ -305,34 +305,32 @@ bool compareObject(Object* lhs, Object* rhs) {
 }
 
 
-enum procType { PROCEDURE_PRIMITIVE, PROCEDURE_LAMBDA, PROCEDURE_VARLAMBDA };
+enum funcType { PRIMITIVE, LAMBDA, VARLAMBDA };
 
 const int EVAL = 0;
 const int NO_EVAL = 1;
 
 
-struct Procedure {
-    procType type;
+struct Function {
+    funcType type;
     unsigned char args;
     List* env;
     List* free_vars;
-    union {
-        Object* (*function)(List*);
-        Object* code;
-    };
+    Object* (EvalApply::*func)(List*);
+    Object* code;
 };
 
-Procedure* makeProcedure(Object* (*function)(List*), int num_args) {
-    Procedure* p = new Procedure;
-    p->function = function;
+Function* makeFunction(Object* (EvalApply::*function)(List*), int num_args) {
+    Function* p = new Function;
+    p->func = function;
     p->free_vars = new List();
     p->env = nullptr;
-    p->type = PROCEDURE_PRIMITIVE;
+    p->type = PRIMITIVE;
     return p; 
 }
 
-Procedure* allocProcedure(List* vars, Object* code, List* penv, procType type) {
-    Procedure* p = new Procedure;
+Function* allocFunction(List* vars, Object* code, List* penv, funcType type) {
+    Function* p = new Function;
     p->code = code;
     p->env = penv;
     p->type = type;
@@ -344,17 +342,7 @@ struct SpecialForm {
     string name;
     int num_args;
     char flags[3];
-    Object* (*function)(List*, List*);
+    Object* (EvalApply::*func)(List*, List*);
 };
-
-SpecialForm* makeOperator(string& nm, int na, char* flgs, Object* (*func)(List*,List*)) {
-    SpecialForm* oper = new SpecialForm;
-    oper->name = nm;
-    oper->num_args = na;
-    for (int i = 0; flgs[i] != '\0'; i++)
-        oper->flags[i] = flgs[i];
-    oper->function = func;
-    return oper;
-}
 
 #endif
