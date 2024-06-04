@@ -9,3 +9,7 @@ Based on https://github.com/Jaffe-/lispc/
          -> fib
      repl> (fib 6)
        13
+     repl> (define fact (lambda (x) (if (eq x 0) 1 (* x (fact (- x 1))))))
+        -> fact
+     repl> (fact 5)
+       120
