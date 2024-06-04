@@ -9,13 +9,15 @@ using namespace std;
 
 class EvalApply {
     private:
-        int num_operators = 3;
+        int num_operators;
         SpecialForm* specialForms;
-        Object* envLookUp(List* env, Object* obj);
-        
+
         Object* specialDefine(List* args, List* env);
         Object* specialIf(List* args, List* env);
         Object* specialLambda(List* args, List* env);
+        Object* specialQuote(List* args, List* env);
+        Object* specialSet(List* args, List* env);
+        Object* specialDo(List* args, List* env);
 
         Object* primitivePlus(List* args);
         Object* primitiveMinus(List* args);
@@ -27,42 +29,53 @@ class EvalApply {
         Object* primitivePrint(List* args);
         Object* primitiveCar(List* args);
         Object* primitiveCdr(List* args);
+        Object* primitivePush(List* args);
 
         Object* applySpecial(SpecialForm* special, List* args, List* environment);
         Object* applyMathPrimitive(List* args, string op);
         Object* apply(Function* proc, List* args, List* env);
+        Object* eval(Object* obj, List* env);
+
         List* makeNewEnvironment(List* vars, List* vals);
         void addBinding(Binding* binding);
-        void addPrimitive(string symbol, int numArgs, Object* (EvalApply::*func)(List*));
-        Object* eval(Object* obj, List* env);
+        void addPrimitive(string symbol, Object* (EvalApply::*func)(List*));
+        Object* envLookUp(List* env, Object* obj);
         List* environment;
     public:
-        EvalApply() {
-            environment = new List();
-            specialForms = new SpecialForm[3] {
-                {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine},
-                {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf},
-                {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda}
-            };
-            addPrimitive("+", 0, &EvalApply::primitivePlus);
-            addPrimitive("-", 0, &EvalApply::primitiveMinus);
-            addPrimitive("/", 0, &EvalApply::primitiveDivide);
-            addPrimitive("*", 0, &EvalApply::primitiveMultiply);
-            addPrimitive("<", 0, &EvalApply::primitiveLess);
-            addPrimitive("eq", 0, &EvalApply::primitiveEquals);
-            addPrimitive("print", 0, &EvalApply::primitivePrint);
-            addPrimitive(">", 0, &EvalApply::primitiveGreater);
-            addPrimitive("car", 0, &EvalApply::primitiveCar);
-            addPrimitive("cdr", 0, &EvalApply::primitiveCdr);
-        }
+        EvalApply();
         Object* eval(List* expression);
 };
 
 void EvalApply::addBinding(Binding* binding) {
     environment->append(makeBindingObject(binding));
 }
-void EvalApply::addPrimitive(string symbol, int numArgs, Object* (EvalApply::*func)(List*)) {
-    addBinding(makeBinding(makeSymbolObject(symbol), makeFunctionObject(makeFunction(func, numArgs))));
+void EvalApply::addPrimitive(string symbol, Object* (EvalApply::*func)(List*)) {
+    addBinding(makeBinding(makeSymbolObject(symbol), makeFunctionObject(makeFunction(func))));
+}
+
+EvalApply::EvalApply() {
+    environment = new List();
+    num_operators = 6;
+    specialForms = new SpecialForm[num_operators] {
+        {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine},
+        {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf},
+        {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda},
+        {"'", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialQuote},
+        {"set", 2, {NO_EVAL, EVAL}, &EvalApply::specialSet},
+        {"do", 0, {}, &EvalApply::specialDo}
+    };
+
+    addPrimitive("+", &EvalApply::primitivePlus);
+    addPrimitive("-", &EvalApply::primitiveMinus);
+    addPrimitive("/", &EvalApply::primitiveDivide);
+    addPrimitive("*", &EvalApply::primitiveMultiply);
+    addPrimitive("<", &EvalApply::primitiveLess);
+    addPrimitive("eq", &EvalApply::primitiveEquals);
+    addPrimitive("print", &EvalApply::primitivePrint);
+    addPrimitive(">", &EvalApply::primitiveGreater);
+    addPrimitive("car", &EvalApply::primitiveCar);
+    addPrimitive("cdr", &EvalApply::primitiveCdr);
+    addPrimitive("push", &EvalApply::primitivePush);
 }
 
 Object* EvalApply::envLookUp(List* env, Object* obj) {
@@ -70,7 +83,7 @@ Object* EvalApply::envLookUp(List* env, Object* obj) {
         if (compareObject(obj, it->info->bindingVal->symbol))
             return it->info->bindingVal->value;
     }
-    return makeErrorObject("Not Found");
+    return makeErrorObject("<Error: " + toString(obj) + " Not Found>");
 }
 
 Object* EvalApply::specialDefine(List* args, List* env) {
@@ -110,6 +123,34 @@ Object* EvalApply::specialLambda(List* args, List* env) {
         }
     }
     return makeFunctionObject(allocFunction(argList, code, env, pt));
+}
+
+Object* EvalApply::specialQuote(List* args, List* env) {
+    return args->first()->info;
+}
+
+Object* EvalApply::specialSet(List* args, List* env) {
+    Object* symbol = args->first()->info;
+    Object* replacement = args->first()->next->info;
+    for (ListNode* it = env->first(); it != nullptr; it = it->next) {
+        if (compareObject(it->info->bindingVal->symbol, symbol)) {
+            it->info->bindingVal->value = replacement;
+            return replacement;
+        }
+    }
+    env->append(makeBindingObject(makeBinding(symbol, replacement)));
+    return replacement;
+}
+
+Object* EvalApply::specialDo(List* args, List* env) {
+    Object* result;
+    for (ListNode* it = args->first(); it != nullptr; it = it->next) {
+        result = eval(it->info, env);
+        if (result->type == AS_ERROR) {
+            return result;
+        }
+    }
+    return result;
 }
 
 Object* EvalApply::primitivePlus(List* args) {
@@ -172,6 +213,15 @@ Object* EvalApply::primitiveCdr(List* args) {
     return makeListObject(args->rest());
 }
 
+Object* EvalApply::primitivePush(List* args) {
+    if (args->first()->next->info->type != AS_LIST) {
+        return makeErrorObject("<Error: Can only push to a list!>");
+    }
+    Object* toPush = args->first()->info;
+    List* addTo = args->first()->next->info->listVal->copy();
+    addTo->push(toPush);
+    return makeListObject(addTo);
+}
 List* EvalApply::makeNewEnvironment(List* vars, List* vals) {
     List* nenv = new List();
     ListNode* currVar = vars->first();
@@ -230,27 +280,28 @@ Object* EvalApply::apply(Function* proc, List* args, List* env) {
 
 Object* EvalApply::eval(Object* obj, List* env) {
     if (obj->type == AS_INT) {
-        //cout<<"Evaluated "<<toString(obj)<<" as int"<<endl;
+        cout<<"Evaluated "<<toString(obj)<<" as int"<<endl;
         return obj;
     }
     if (obj->type == AS_REAL) {
-        //cout<<"Evaluated "<<toString(obj)<<" as real"<<endl;
+        cout<<"Evaluated "<<toString(obj)<<" as real"<<endl;
         return obj;
     }
     if (obj->type == AS_FUNCTION) {
-        //cout<<"Evaluated "<<toString(obj)<<" as function"<<endl;
+        cout<<"Evaluated "<<toString(obj)<<" as function"<<endl;
         return obj;
     }
     if (obj->type == AS_ERROR) {
-        //cout<<"Evaluated "<<toString(obj)<<" as Error"<<endl;
+        cout<<"Evaluated "<<toString(obj)<<" as Error"<<endl;
         return obj;
     }
     if (obj->type == AS_SYMBOL) {
         Object* ret =  envLookUp(env, obj);
-       // cout<<"Evaluated "<<toString(ret)<<" From Symbol "<<toString(obj)<<endl;
+        cout<<"Evaluated "<<toString(ret)<<" From Symbol "<<toString(obj)<<endl;
         return ret;
     }
     if (obj->type == AS_LIST) {
+        cout<<"Evaluating as List"<<endl;
         List* list = obj->listVal;
         if (list->empty())
             return obj;

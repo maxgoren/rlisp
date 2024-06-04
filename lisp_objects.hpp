@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <stack>
+#include <cmath>
 using namespace std;
 
 class EvalApply;
@@ -48,9 +49,10 @@ Object* makeIntObject(int value) {
 
 Object* makeRealObject(double val) {
     Object* obj = new Object;
-    if (val == static_cast<int>(val)) {
+    if (fmod(val, 1) == 0) {
+        cout<<"Saving as Int."<<endl;
         obj->type = AS_INT;
-        obj->intVal = static_cast<int>(val);
+        obj->intVal = val;
     } else {
         obj->type = AS_REAL;
         obj->realVal = val;
@@ -149,6 +151,12 @@ class List {
             tail = t;
             count++;
         }
+        void push(Object* obj) {
+            head = new node(obj, head);
+            if (tail == nullptr)
+                tail = head;
+            count++;
+        }
         List& operator=(const List& list) {
             head = nullptr;
             tail = nullptr;
@@ -161,20 +169,7 @@ class List {
             return head;   
         }
         List* rest() {
-            List* nl = new List();
-            ListNode* it = head->next;
-            for (; it != nullptr; it = it->next) {
-                //cout<<"Appending "<<toString(it->info)<<" of type "<<typeSty[it->info->type]<<endl;
-                nl->append(it->info);
-            }
-            return nl;
-        }
-        string asString() {
-            string str = "( ";
-            for (link it = head; it != nullptr; it = it->next)
-                str.append(toString(it->info) + " ");
-            str.append(")");
-            return str;
+            return copyOmitNth(0);
         }
         int find(Object* obj) {
             int i = 0;
@@ -228,10 +223,17 @@ class List {
                 cout<<toString(it->info)<<" ";
             cout<<")"<<endl;
         }
-        List copy() {
-            List nl;
+        string asString() {
+            string str = "( ";
             for (link it = head; it != nullptr; it = it->next)
-                nl.append(it->info);
+                str.append(toString(it->info) + " ");
+            str.append(")");
+            return str;
+        }
+        List* copy() {
+            List* nl = new List();
+            for (link it = head; it != nullptr; it = it->next)
+                nl->append(it->info);
             return nl;
         }
         List* copyOmitNth(int N) {
@@ -261,8 +263,8 @@ Binding* makeBinding(Object* symbol, Object* value) {
 
 string toString(Object* obj) {
     switch (obj->type) {
-        case AS_INT: 
-        case AS_REAL: return to_string(obj->intVal);
+        case AS_INT: return to_string(obj->intVal);
+        case AS_REAL: return to_string(obj->realVal);
         case AS_LIST: return obj->listVal->asString();
         case AS_FUNCTION: return "(func)";
         case AS_ERROR:
@@ -313,14 +315,13 @@ const int NO_EVAL = 1;
 
 struct Function {
     funcType type;
-    unsigned char args;
     List* env;
     List* free_vars;
     Object* (EvalApply::*func)(List*);
     Object* code;
 };
 
-Function* makeFunction(Object* (EvalApply::*function)(List*), int num_args) {
+Function* makeFunction(Object* (EvalApply::*function)(List*)) {
     Function* p = new Function;
     p->func = function;
     p->free_vars = new List();
