@@ -3,12 +3,15 @@
 #include <iostream>
 #include <vector>
 #include <stack>
-#include "lisp_objects.hpp"
-#include "lisp_lex.hpp"
+#include "objects.hpp"
+#include "lex.hpp"
+#include "list.hpp"
 using namespace std;
 
 class EvalApply {
     private:
+        bool loud;
+        void say(string s);
         int num_operators;
         SpecialForm* specialForms;
 
@@ -42,9 +45,19 @@ class EvalApply {
         Object* envLookUp(List* env, Object* obj);
         List* environment;
     public:
-        EvalApply();
+        EvalApply(bool noisey = false);
         Object* eval(List* expression);
+        void setTrace(bool trace);
 };
+
+void EvalApply::setTrace(bool trace) {
+    loud = trace;
+}
+
+void EvalApply::say(string s) {
+    if (loud)
+        cout<<s<<endl;
+}
 
 void EvalApply::addBinding(Binding* binding) {
     environment->append(makeBindingObject(binding));
@@ -53,7 +66,8 @@ void EvalApply::addPrimitive(string symbol, Object* (EvalApply::*func)(List*)) {
     addBinding(makeBinding(makeSymbolObject(symbol), makeFunctionObject(makeFunction(func))));
 }
 
-EvalApply::EvalApply() {
+EvalApply::EvalApply(bool noisey) {
+    loud = noisey;
     environment = new List();
     num_operators = 6;
     specialForms = new SpecialForm[num_operators] {
@@ -109,20 +123,7 @@ Object* EvalApply::specialLambda(List* args, List* env) {
     Object* argsList = args->first()->info;
     Object* code = args->first()->next->info;  
     List* argList = argsList->listVal;
-    Object elip;
-    elip.type = AS_SYMBOL;
-    elip.strVal = new string("..");
-    int index;
-    funcType pt = LAMBDA;
-    if ((index = argList->find(&elip)) != -1) {
-        if (index == argList->size() - 2) {
-            pt = VARLAMBDA;
-            argList = argList->copyOmitNth(index);
-        } else {
-            return makeErrorObject("<error>");
-        }
-    }
-    return makeFunctionObject(allocFunction(argList, code, env, pt));
+    return makeFunctionObject(allocFunction(argList, code, env, LAMBDA));
 }
 
 Object* EvalApply::specialQuote(List* args, List* env) {
@@ -280,28 +281,28 @@ Object* EvalApply::apply(Function* proc, List* args, List* env) {
 
 Object* EvalApply::eval(Object* obj, List* env) {
     if (obj->type == AS_INT) {
-        cout<<"Evaluated "<<toString(obj)<<" as int"<<endl;
+        say("Evaluated " + toString(obj) + " as int");
         return obj;
     }
     if (obj->type == AS_REAL) {
-        cout<<"Evaluated "<<toString(obj)<<" as real"<<endl;
+        say("Evaluated " + toString(obj) + " as real");
         return obj;
     }
     if (obj->type == AS_FUNCTION) {
-        cout<<"Evaluated "<<toString(obj)<<" as function"<<endl;
+        say("Evaluated " + toString(obj) + " as function");
         return obj;
     }
     if (obj->type == AS_ERROR) {
-        cout<<"Evaluated "<<toString(obj)<<" as Error"<<endl;
+        say("Evaluated " + toString(obj) + " as Error");
         return obj;
     }
     if (obj->type == AS_SYMBOL) {
         Object* ret =  envLookUp(env, obj);
-        cout<<"Evaluated "<<toString(ret)<<" From Symbol "<<toString(obj)<<endl;
+        say("Evaluated " + toString(ret) + " From Symbol " + toString(obj));
         return ret;
     }
     if (obj->type == AS_LIST) {
-        cout<<"Evaluating as List"<<endl;
+        say("Evaluated " + toString(obj) + " as List");
         List* list = obj->listVal;
         if (list->empty())
             return obj;
@@ -310,23 +311,27 @@ Object* EvalApply::eval(Object* obj, List* env) {
             for (int i = 0; i < num_operators; i++) {
                 if (sym == specialForms[i].name) {
                     List* arguments = list->rest();
+                    say("Applying Special Form: " + specialForms[i].name);
                     return applySpecial(&specialForms[i], arguments, env);
                 }
             }
         }
         List* evaluated_args = new List();
+        say("Evaluating Arguments");
         for (ListNode* curr = list->first(); curr != nullptr; curr = curr->next) {
             Object* el = eval(curr->info, env);
             evaluated_args->append(el);
         }
         if (evaluated_args->first()->info->type == AS_FUNCTION)  {
             List* arguments = evaluated_args->rest();
+            say("Applying function");
             return apply(evaluated_args->first()->info->procedureVal, arguments, env);
         }
         return makeListObject(evaluated_args);
     }
     return makeErrorObject("Error during eval");
 }
+
 /*
  * I met a traveller from an antique land,
  * Who said—“Two vast and trunkless legs of stone
@@ -343,6 +348,7 @@ Object* EvalApply::eval(Object* obj, List* env) {
  * Of that colossal Wreck, boundless and bare
  * The lone and level sands stretch far away.”
 */
+
 Object* EvalApply::eval(List* expr) {
     return eval(makeListObject(expr), environment);
 }
