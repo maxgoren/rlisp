@@ -307,6 +307,7 @@ Object* EvalApply::eval(Object* obj, List* env) {
         if (list->empty())
             return obj;
         if (list->first()->info->type == AS_SYMBOL) {
+            //First check if symbol is for special form
             string sym = *list->first()->info->strVal;
             for (int i = 0; i < num_operators; i++) {
                 if (sym == specialForms[i].name) {
@@ -316,6 +317,7 @@ Object* EvalApply::eval(Object* obj, List* env) {
                 }
             }
         }
+        //Evaluate each argument before either applying function or returning list
         List* evaluated_args = new List();
         say("Evaluating Arguments");
         for (ListNode* curr = list->first(); curr != nullptr; curr = curr->next) {
