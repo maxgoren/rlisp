@@ -278,7 +278,8 @@ Object* EvalApply::apply(Function* proc, List* args, List* env) {
     }
     return makeErrorObject("An error in apply occured");
 }
-
+//Lines 304 - 322 are essentially where the magic happens
+//This for all intents and purposes, is what _makes_ lisp
 Object* EvalApply::eval(Object* obj, List* env) {
     if (obj->type == AS_INT) {
         say("Evaluated " + toString(obj) + " as int");
