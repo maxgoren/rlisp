@@ -6,6 +6,7 @@
 #include "objects.hpp"
 #include "lex.hpp"
 #include "evalapply.hpp"
+#include "readline/readline.h"
 using namespace std;
 
 class REPL {
@@ -27,9 +28,11 @@ void REPL::start() {
     bool running = true;
     int exprNo = 1;
     bool tracing = false;
+    char* buff;
     while (running) {
-        cout<<"mgclisp("<<exprNo<<")> ";
-        getline(cin, input);
+        string prompt = "mgclisp(" + to_string(exprNo) + ")> ";
+        input = readline(prompt.c_str());
+        //getline(cin, input);
         if (input.empty())
             continue;
         if (input == "quit") {

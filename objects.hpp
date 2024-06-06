@@ -23,7 +23,7 @@ inline vector<string> typeStr = { "AS_INT", "AS_REAL", "AS_SYMBOL", "AS_BOOL", "
 class EvalApply;
 class List;
 struct Binding;
-struct Function;
+struct Procedure;
 
 struct Object {
     objType type;
@@ -34,7 +34,7 @@ struct Object {
         string* strVal;
         List* listVal;
         Binding* bindingVal;
-        Function* procedureVal;
+        Procedure* procedureVal;
     };
 };
 
@@ -71,7 +71,7 @@ Object* makeListObject(List* value) {
     return obj;
 }
 
-Object* makeFunctionObject(Function* proc) {
+Object* makeFunctionObject(Procedure* proc) {
     Object* obj = new Object;
     obj->type = AS_FUNCTION;
     obj->procedureVal = proc;
@@ -118,7 +118,7 @@ enum funcType { PRIMITIVE, LAMBDA };
 const int EVAL = 0;
 const int NO_EVAL = 1;
 
-struct Function {
+struct Procedure {
     funcType type;
     List* env;
     List* free_vars;
@@ -126,8 +126,8 @@ struct Function {
     Object* code;
 };
 
-Function* allocFunction(List* vars, Object* code, List* penv, funcType type) {
-    Function* p = new Function;
+Procedure* allocFunction(List* vars, Object* code, List* penv, funcType type) {
+    Procedure* p = new Procedure;
     p->code = code;
     p->env = penv;
     p->type = type;
