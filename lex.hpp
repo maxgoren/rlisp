@@ -36,79 +36,91 @@ class Lexer {
     private:
         Buffer buffer;
         Stack<char> parStack;
-        bool is_skip(char c) {
-            switch (c) {
-                case ' ':
-                case '\t':
-                case '\r':
-                case '\n':
-                    return true;
-                default:
-                    return false;
-            }
-            return false;
-        }
-        Lexeme extractNumber() {
-            bool isReal = false;
-            string number;
-            while (!is_skip(buffer.getChar()) && (isdigit(buffer.getChar()) || buffer.getChar() == '.')) {
-                number.push_back(buffer.getChar());
-                if (buffer.getChar() == '.') isReal = true;
-                buffer.advance();
-            }
-            return Lexeme((isReal ? REALNUM:NUMBER), number);
-        }
-        Lexeme extractWord() {
-            string word;
-            while (!is_skip(buffer.getChar()) && (isalpha(buffer.getChar()) || isdigit(buffer.getChar()) || buffer.getChar() == '-')) {
-                word.push_back(buffer.getChar());
-                buffer.advance();
-            }
-            return Lexeme(SYMBOL, word);
-        }
-        Lexeme checkSpecials() {
-            switch (buffer.getChar()) {
-                case '(': 
-                    parStack.push(buffer.getChar());
-                    return Lexeme(LPAREN, "(");
-                case ')': 
-                    if (parStack.empty() || parStack.top() != '(') {
-                        cout<<"Error: Mismatched Parentheses!"<<endl;
-                        return Lexeme(ERROR, "Mismatched Parentheses");
-                    } else {
-                        parStack.pop();
-                    }
-                    return Lexeme(RPAREN, ")");
-                default:
-                    break;
-            }
-            string sc;
-            sc.push_back(buffer.getChar());
-            return Lexeme(SYMBOL, sc);
-        }
+        bool is_skip(char c);
+        Lexeme extractNumber();
+        Lexeme extractWord();
+        Lexeme checkSpecials();
     public:
-        Lexer() {
-
-        }
-        vector<Lexeme> lex(string input) {
-            vector<Lexeme> tokens;
-            parStack.clear();
-            buffer.init(input);
-            while (!buffer.isEOF()) {
-                if (is_skip(buffer.getChar())) {
-                    buffer.advance();
-                    continue;
-                } else if (isdigit(buffer.getChar())) {
-                    tokens.push_back(extractNumber());
-                } else if (isalpha(buffer.getChar())) {
-                    tokens.push_back(extractWord());
-                } else {
-                    tokens.push_back(checkSpecials());
-                    buffer.advance();
-                }
-            }
-            return tokens;
-        }
+        Lexer();
+        vector<Lexeme> lex(string input);
 };
+
+Lexer::Lexer() {
+
+}
+
+vector<Lexeme> Lexer::lex(string input) {
+    vector<Lexeme> tokens;
+    parStack.clear();
+    buffer.init(input);
+    while (!buffer.isEOF()) {
+        if (is_skip(buffer.getChar())) {
+            buffer.advance();
+            continue;
+        } else if (isdigit(buffer.getChar())) {
+            tokens.push_back(extractNumber());
+        } else if (isalpha(buffer.getChar())) {
+            tokens.push_back(extractWord());
+        } else {
+            tokens.push_back(checkSpecials());
+            buffer.advance();
+        }
+    }
+    return tokens;
+}
+
+bool Lexer::is_skip(char c) {
+    switch (c) {
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+            return true;
+        default:
+            return false;
+    }
+    return false;
+}
+
+Lexeme Lexer::extractNumber() {
+    bool isReal = false;
+    string number;
+    while (!is_skip(buffer.getChar()) && (isdigit(buffer.getChar()) || buffer.getChar() == '.')) {
+        number.push_back(buffer.getChar());
+        if (buffer.getChar() == '.') isReal = true;
+        buffer.advance();
+    }
+    return Lexeme((isReal ? REALNUM:NUMBER), number);
+}
+
+Lexeme Lexer::extractWord() {
+    string word;
+    while (!is_skip(buffer.getChar()) && (isalpha(buffer.getChar()) || isdigit(buffer.getChar()) || buffer.getChar() == '-' || buffer.getChar() == '?')) {
+        word.push_back(buffer.getChar());
+        buffer.advance();
+    }
+    return Lexeme(SYMBOL, word);
+}
+
+Lexeme Lexer::checkSpecials() {
+    switch (buffer.getChar()) {
+        case '(': 
+            parStack.push(buffer.getChar());
+            return Lexeme(LPAREN, "(");
+        case ')': 
+            if (parStack.empty() || parStack.top() != '(') {
+                cout<<"Error: Mismatched Parentheses!"<<endl;
+                return Lexeme(ERROR, "Mismatched Parentheses");
+            } else {
+                parStack.pop();
+            }
+            return Lexeme(RPAREN, ")");
+        default:
+            break;
+    }
+    string sc;
+    sc.push_back(buffer.getChar());
+    return Lexeme(SYMBOL, sc);
+}
 
 #endif

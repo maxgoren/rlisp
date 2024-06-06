@@ -214,7 +214,7 @@ string toString(Object* obj) {
 bool compareObject(Object* lhs, Object* rhs) {
     if (lhs->type != rhs->type)
         return false;
-     switch (lhs->type) {
+    switch (lhs->type) {
         case AS_INT: return lhs->intVal == rhs->intVal;
         case AS_REAL: return lhs->realVal == rhs->realVal;
         case AS_FUNCTION: return false;
@@ -222,6 +222,10 @@ bool compareObject(Object* lhs, Object* rhs) {
         case AS_BOOL: return lhs->boolVal == rhs->boolVal;
         case AS_LIST:
             {
+                if (lhs->listVal->size() == 0 && rhs->listVal->size() == 0)
+                    return true;
+                else if (lhs->listVal->size() == 0 || rhs->listVal->size() == 0)
+                    return false;
                 ListNode* ls = lhs->listVal->first();
                 ListNode* rs = rhs->listVal->first();
                 while (ls != nullptr && rs != nullptr) {

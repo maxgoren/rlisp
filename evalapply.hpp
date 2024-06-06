@@ -21,7 +21,8 @@ class EvalApply {
         Object* specialQuote(List* args, List* env);
         Object* specialSet(List* args, List* env);
         Object* specialDo(List* args, List* env);
-
+        Object* specialCond(List* args, List* env);
+        Object* specialLet(List* args, List* env);
         Object* primitivePlus(List* args);
         Object* primitiveMinus(List* args);
         Object* primitiveMultiply(List* args);
@@ -69,14 +70,16 @@ void EvalApply::addPrimitive(string symbol, Object* (EvalApply::*func)(List*)) {
 EvalApply::EvalApply(bool noisey) {
     loud = noisey;
     environment = new List();
-    num_operators = 6;
+    num_operators = 8;
     specialForms = new SpecialForm[num_operators] {
         {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine},
         {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf},
         {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda},
         {"'", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialQuote},
         {"set", 2, {NO_EVAL, EVAL}, &EvalApply::specialSet},
-        {"do", 0, {}, &EvalApply::specialDo}
+        {"do", 0, {}, &EvalApply::specialDo},
+        {"cond", 0, {}, &EvalApply::specialCond},
+        {"let",2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLet}
     };
 
     addPrimitive("+", &EvalApply::primitivePlus);
@@ -154,6 +157,43 @@ Object* EvalApply::specialDo(List* args, List* env) {
     return result;
 }
 
+Object* EvalApply::specialCond(List* args, List* env) {
+    Object* result = makeIntObject(0);
+    for (ListNode* curr = args->first(); curr != nullptr; curr = curr->next) {
+        if (getObjectType(curr->info) != AS_LIST) {
+            return makeErrorObject("Error: cond operates on lists only.");
+        }
+        List* toEval = curr->info->listVal;
+        result = eval(curr->info, env);
+        if (result->type == AS_ERROR) {
+            return result;
+        }
+
+    }
+    return result;
+}
+
+Object* EvalApply::specialLet(List* args, List* env) {
+    List* vars = args->first()->info->listVal;
+    List* body = args->first()->next->info->listVal;
+    List* var_names = new List();
+    List* var_vals = new List();
+    for (ListNode* curr = vars->first(); curr != nullptr; curr = curr->next) {
+        if (curr->info->type == AS_LIST) {
+        var_names->append(makeSymbolObject(*curr->info->listVal->first()->info->strVal));
+        var_vals->append(curr->info->listVal->first()->next->info);
+        } else {
+            return makeErrorObject("Let requires its own association list");
+        }
+    }
+    
+    Function* tempfunc = allocFunction(var_names, makeListObject(body), env, LAMBDA);
+    List* asList = new List();
+    asList->append(makeFunctionObject(tempfunc));
+    asList->addMissing(var_vals);
+    return eval(makeListObject(asList), env);
+}
+
 Object* EvalApply::primitivePlus(List* args) {
     return applyMathPrimitive(args, "+");
 }
@@ -203,7 +243,11 @@ Object* EvalApply::primitivePrint(List* args) {
         Object* ce = eval(it->info, environment);
         evaldArgs->append(ce);
     }
-    cout<<evaldArgs->asString()<<endl;
+    if (evaldArgs->size() == 1 && evaldArgs->first()->info->type == AS_LIST) {
+        cout<<evaldArgs->first()->info->listVal->asString()<<endl;
+    } else {
+        cout<<evaldArgs->asString()<<endl;
+    }
     return new Object();
 }
 Object* EvalApply::primitiveCar(List* args) {
@@ -278,8 +322,7 @@ Object* EvalApply::apply(Function* proc, List* args, List* env) {
     }
     return makeErrorObject("An error in apply occured");
 }
-//Lines 304 - 322 are essentially where the magic happens
-//This for all intents and purposes, is what _makes_ lisp
+
 Object* EvalApply::eval(Object* obj, List* env) {
     if (obj->type == AS_INT) {
         say("Evaluated " + toString(obj) + " as int");
@@ -308,7 +351,6 @@ Object* EvalApply::eval(Object* obj, List* env) {
         if (list->empty())
             return obj;
         if (list->first()->info->type == AS_SYMBOL) {
-            //First check if symbol is for special form
             string sym = *list->first()->info->strVal;
             for (int i = 0; i < num_operators; i++) {
                 if (sym == specialForms[i].name) {
@@ -318,7 +360,6 @@ Object* EvalApply::eval(Object* obj, List* env) {
                 }
             }
         }
-        //Evaluate each argument before either applying function or returning list
         List* evaluated_args = new List();
         say("Evaluating Arguments");
         for (ListNode* curr = list->first(); curr != nullptr; curr = curr->next) {

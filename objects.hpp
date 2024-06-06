@@ -99,6 +99,10 @@ Object* makeBoolObject(bool value) {
     return obj;
 }
 
+objType getObjectType(Object* obj) {
+    return obj->type;
+}
+
 struct Binding {
     Object* symbol;
     Object* value;

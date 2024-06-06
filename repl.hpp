@@ -30,6 +30,8 @@ void REPL::start() {
     while (running) {
         cout<<"mgclisp("<<exprNo<<")> ";
         getline(cin, input);
+        if (input.empty())
+            continue;
         if (input == "quit") {
             running = false;
         } else if (input == ".trace") {
