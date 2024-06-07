@@ -11,6 +11,9 @@ using namespace std;
 class EvalApply {
     private:
         bool loud;
+        int d;
+        void enter();
+        void leave();
         void say(string s);
         int num_operators;
         SpecialForm* specialForms;
@@ -37,7 +40,7 @@ class EvalApply {
 
         Object* applySpecial(SpecialForm* special, List* args, List* environment);
         Object* applyMathPrimitive(List* args, string op);
-        Object* apply(Function* proc, List* args, List* env);
+        Object* apply(Procedure* proc, List* args, List* env);
         Object* eval(Object* obj, List* env);
 
         List* makeNewEnvironment(List* vars, List* vals);
@@ -56,8 +59,17 @@ void EvalApply::setTrace(bool trace) {
 }
 
 void EvalApply::say(string s) {
-    if (loud)
+    if (loud) {
+        for (int i = 0; i < d; i++) cout<<" ";
         cout<<s<<endl;
+    }
+}
+
+void EvalApply::enter() {
+    d++;
+}
+void EvalApply::leave() {
+    d--;
 }
 
 void EvalApply::addBinding(Binding* binding) {
@@ -69,6 +81,7 @@ void EvalApply::addPrimitive(string symbol, Object* (EvalApply::*func)(List*)) {
 
 EvalApply::EvalApply(bool noisey) {
     loud = noisey;
+    d = 0;
     environment = new List();
     num_operators = 8;
     specialForms = new SpecialForm[num_operators] {
@@ -96,9 +109,9 @@ EvalApply::EvalApply(bool noisey) {
 }
 
 Object* EvalApply::envLookUp(List* env, Object* obj) {
-    for (ListNode* it = env->first(); it != nullptr; it = it->next) {
-        if (compareObject(obj, it->info->bindingVal->symbol))
-            return it->info->bindingVal->value;
+    for (Object* it : *env) {
+        if (compareObject(obj, it->bindingVal->symbol))
+            return it->bindingVal->value;
     }
     return makeErrorObject("<Error: " + toString(obj) + " Not Found>");
 }
@@ -136,9 +149,9 @@ Object* EvalApply::specialQuote(List* args, List* env) {
 Object* EvalApply::specialSet(List* args, List* env) {
     Object* symbol = args->first()->info;
     Object* replacement = args->first()->next->info;
-    for (ListNode* it = env->first(); it != nullptr; it = it->next) {
-        if (compareObject(it->info->bindingVal->symbol, symbol)) {
-            it->info->bindingVal->value = replacement;
+    for (Object* info : *args) {
+        if (compareObject(info->bindingVal->symbol, symbol)) {
+            info->bindingVal->value = replacement;
             return replacement;
         }
     }
@@ -148,8 +161,8 @@ Object* EvalApply::specialSet(List* args, List* env) {
 
 Object* EvalApply::specialDo(List* args, List* env) {
     Object* result;
-    for (ListNode* it = args->first(); it != nullptr; it = it->next) {
-        result = eval(it->info, env);
+    for (Object* info : *args) {
+        result = eval(info, env);
         if (result->type == AS_ERROR) {
             return result;
         }
@@ -159,16 +172,15 @@ Object* EvalApply::specialDo(List* args, List* env) {
 
 Object* EvalApply::specialCond(List* args, List* env) {
     Object* result = makeIntObject(0);
-    for (ListNode* curr = args->first(); curr != nullptr; curr = curr->next) {
-        if (getObjectType(curr->info) != AS_LIST) {
+    for (Object* info : *args) {
+        if (getObjectType(info) != AS_LIST) {
             return makeErrorObject("Error: cond operates on lists only.");
         }
-        List* toEval = curr->info->listVal;
-        result = eval(curr->info, env);
+        List* toEval = info->listVal;
+        result = eval(info, env);
         if (result->type == AS_ERROR) {
             return result;
         }
-
     }
     return result;
 }
@@ -178,16 +190,16 @@ Object* EvalApply::specialLet(List* args, List* env) {
     List* body = args->first()->next->info->listVal;
     List* var_names = new List();
     List* var_vals = new List();
-    for (ListNode* curr = vars->first(); curr != nullptr; curr = curr->next) {
-        if (curr->info->type == AS_LIST) {
-        var_names->append(makeSymbolObject(*curr->info->listVal->first()->info->strVal));
-        var_vals->append(curr->info->listVal->first()->next->info);
+    for (Object* info : *vars) {
+        if (info->type == AS_LIST) {
+        var_names->append(makeSymbolObject(*info->listVal->first()->info->strVal));
+        var_vals->append(info->listVal->first()->next->info);
         } else {
             return makeErrorObject("Let requires its own association list");
         }
     }
     
-    Function* tempfunc = allocFunction(var_names, makeListObject(body), env, LAMBDA);
+    Procedure* tempfunc = allocFunction(var_names, makeListObject(body), env, LAMBDA);
     List* asList = new List();
     asList->append(makeFunctionObject(tempfunc));
     asList->addMissing(var_vals);
@@ -195,18 +207,23 @@ Object* EvalApply::specialLet(List* args, List* env) {
 }
 
 Object* EvalApply::primitivePlus(List* args) {
+    say("primitive plus " + args->asString());
     return applyMathPrimitive(args, "+");
 }
 Object* EvalApply::primitiveMinus(List* args) {
+    say("primitive minus " + args->asString());
     return applyMathPrimitive(args, "-");
 }
 Object* EvalApply::primitiveMultiply(List* args) {
+    say("primitive multiply " + args->asString());
     return applyMathPrimitive(args, "*");
 }
 Object* EvalApply::primitiveDivide(List* args) {
+    say("primitive divide" + args->asString());
     return applyMathPrimitive(args, "/");
 }
 Object* EvalApply::primitiveLess(List* args) {
+    say("primitive less " + args->asString());
     Object* first = args->first()->info;
     Object* second = args->first()->next->info;
     bool result;
@@ -220,6 +237,7 @@ Object* EvalApply::primitiveLess(List* args) {
     return makeBoolObject(result);
 }
 Object* EvalApply::primitiveGreater(List* args) {
+    say("primitive greager " + args->asString());
     Object* first = args->first()->info;
     Object* second = args->first()->next->info;
     bool result;
@@ -233,14 +251,15 @@ Object* EvalApply::primitiveGreater(List* args) {
     return makeBoolObject(result);
 }
 Object* EvalApply::primitiveEquals(List* args) {
+    say("primitive equals" + args->asString());
     Object* first = args->first()->info;
     Object* second = args->first()->next->info;
     return makeBoolObject(compareObject(first, second));
 }
 Object* EvalApply::primitivePrint(List* args) {
     List* evaldArgs = new List();
-    for (ListNode* it = args->first(); it != nullptr; it = it->next) {
-        Object* ce = eval(it->info, environment);
+    for (Object* it : *args) {
+        Object* ce = eval(it, environment);
         evaldArgs->append(ce);
     }
     if (evaldArgs->size() == 1 && evaldArgs->first()->info->type == AS_LIST) {
@@ -251,10 +270,12 @@ Object* EvalApply::primitivePrint(List* args) {
     return new Object();
 }
 Object* EvalApply::primitiveCar(List* args) {
+    say("primitive car " + args->asString());
     return args->first()->info;
 }
 
 Object* EvalApply::primitiveCdr(List* args) {
+    say("primtiive cdr " + args->asString());
     return makeListObject(args->rest());
 }
 
@@ -280,6 +301,7 @@ List* EvalApply::makeNewEnvironment(List* vars, List* vals) {
 }
 
 Object* EvalApply::applySpecial(SpecialForm* special, List* args, List* environment) {
+    enter();
     ListNode* currArg = args->first();
     List* evaluated_args = new List();
     for (int i = 0; i < args->size(); i++) {
@@ -291,15 +313,16 @@ Object* EvalApply::applySpecial(SpecialForm* special, List* args, List* environm
         currArg = currArg->next;
     }
     auto m = special->func;
+    leave();
     return (this->*m)(evaluated_args, environment);
 }
 
 Object* EvalApply::applyMathPrimitive(List* args, string op) {
-    ListNode* curr = args->first();
-    double result = curr->info->type == AS_INT ? curr->info->intVal:curr->info->realVal;
-    for (curr = args->first()->next; curr != nullptr; curr = curr->next) {
-        if (curr->info->type == AS_INT || curr->info->type == AS_REAL) {
-            double t = curr->info->type == AS_INT ? curr->info->intVal:curr->info->realVal;
+    Object* first = args->first()->info;
+    double result = first->type == AS_INT ? first->intVal:first->realVal;
+    for (Object* curr : *args->rest()) {
+        if (curr->type == AS_INT || curr->type == AS_REAL) {
+            double t = curr->type == AS_INT ? curr->intVal:curr->realVal;
             if (op == "+") result += t;
             if (op == "-") result -= t;
             if (op == "*") result *= t;
@@ -309,68 +332,89 @@ Object* EvalApply::applyMathPrimitive(List* args, string op) {
     return makeRealObject(result);
 }
 
-Object* EvalApply::apply(Function* proc, List* args, List* env) {
+Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
+    enter();
     if (proc->type == PRIMITIVE) {
+        say("Applying primitive.");
         auto m = proc->func;
+        leave();
         return (this->*m)(args);
     }
     if (proc->type == LAMBDA) {
         List* nenv = makeNewEnvironment(proc->free_vars, args);
         nenv->addMissing(proc->env);
         nenv->addMissing(env);
+        leave();
         return eval(proc->code, nenv);
     }
+    leave();
     return makeErrorObject("An error in apply occured");
 }
 
 Object* EvalApply::eval(Object* obj, List* env) {
+    enter();
     if (obj->type == AS_INT) {
         say("Evaluated " + toString(obj) + " as int");
+        leave();
         return obj;
     }
     if (obj->type == AS_REAL) {
         say("Evaluated " + toString(obj) + " as real");
+        leave();
+        return obj;
+    }
+    if (obj->type == AS_BOOL) {
+        say("Evaluated " + toString(obj) + " as Bool");
+        leave();
         return obj;
     }
     if (obj->type == AS_FUNCTION) {
         say("Evaluated " + toString(obj) + " as function");
+        leave();
         return obj;
     }
     if (obj->type == AS_ERROR) {
         say("Evaluated " + toString(obj) + " as Error");
+        leave();
         return obj;
     }
     if (obj->type == AS_SYMBOL) {
         Object* ret =  envLookUp(env, obj);
         say("Evaluated " + toString(ret) + " From Symbol " + toString(obj));
+        leave();
         return ret;
     }
     if (obj->type == AS_LIST) {
         say("Evaluated " + toString(obj) + " as List");
         List* list = obj->listVal;
-        if (list->empty())
+        if (list->empty()) {
+            leave();
             return obj;
+        }
         if (list->first()->info->type == AS_SYMBOL) {
             string sym = *list->first()->info->strVal;
             for (int i = 0; i < num_operators; i++) {
                 if (sym == specialForms[i].name) {
                     List* arguments = list->rest();
                     say("Applying Special Form: " + specialForms[i].name);
+                    leave();
                     return applySpecial(&specialForms[i], arguments, env);
                 }
             }
         }
         List* evaluated_args = new List();
         say("Evaluating Arguments");
-        for (ListNode* curr = list->first(); curr != nullptr; curr = curr->next) {
-            Object* el = eval(curr->info, env);
+        for (Object* curr : *list) {
+            Object* el = eval(curr, env);
             evaluated_args->append(el);
         }
         if (evaluated_args->first()->info->type == AS_FUNCTION)  {
             List* arguments = evaluated_args->rest();
             say("Applying function");
+            leave();
             return apply(evaluated_args->first()->info->procedureVal, arguments, env);
         }
+        leave();
         return makeListObject(evaluated_args);
     }
     return makeErrorObject("Error during eval");

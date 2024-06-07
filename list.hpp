@@ -12,6 +12,33 @@ struct ListNode {
     ListNode(Object* obj = nullptr, ListNode* n = nullptr) : info(obj), next(n) { }
 };
 
+class ListIterator {
+    private:
+        ListNode* current;
+    public:
+        ListIterator(ListNode* pos) {
+            current = pos;
+        }
+        bool operator==(const ListIterator& it) const {
+            return current == it.current;
+        }
+        bool operator!=(const ListIterator& it) const {
+            return !(*this==it);
+        }
+        Object*& operator*() {
+            return current->info;
+        }
+        ListIterator operator++() {
+            current = current->next;
+            return *this;
+        }
+        ListIterator operator++(int) {
+            ListIterator it = *this;
+            ++*this;
+            return it;
+        }
+};
+
 class List {
     private:
         using node = ListNode;
@@ -40,6 +67,10 @@ class List {
         List* copyOmitNth(int N);
         void clear();
         List& operator=(const List& list);
+        ListIterator begin();
+        ListIterator end();
+        ListIterator begin() const;
+        ListIterator end() const;
 };
 
 List::List() {
@@ -84,9 +115,13 @@ void List::append(Object* obj) {
 }
 
 void List::push(Object* obj) {
-    head = new node(obj, head);
-    if (tail == nullptr)
-        tail = head;
+    ListNode* t = new ListNode(obj);
+    if (empty()) {
+        tail = t;
+    } else {
+        t->next = head;
+    }
+    head = t;
     count++;
 }
 
@@ -114,9 +149,9 @@ ListNode* List::getNthNode(int N) {
 }
 
 void List::addMissing(List* list) {
-    for (link it = list->first(); it != nullptr; it = it->next) {
-        if (find(it->info) == -1) {
-            append(it->info);
+    for (Object* it : list) {
+        if (find(it) == -1) {
+            append(it);
         }
     }
 }
@@ -150,10 +185,7 @@ Object* List::pop_front() {
 }
 
 void List::print() {
-    cout<<"(";
-    for (link it = head; it != nullptr; it = it->next)
-        cout<<toString(it->info)<<" ";
-    cout<<")"<<endl;
+    cout<<asString()<<endl;
 }
 
 string List::asString() {
@@ -193,6 +225,19 @@ List& List::operator=(const List& list) {
     for (link it = list.head; it != nullptr; it = it->next)
         append(it->info);
     return *this;
+}
+
+ListIterator List::begin() {
+    return ListIterator(head);
+}
+ListIterator List::end() {
+    return ListIterator(nullptr);
+}
+ListIterator List::begin() const {
+    return ListIterator(head);
+}
+ListIterator List::end() const {
+    return ListIterator(nullptr);
 }
 
 string toString(Object* obj) {
@@ -244,8 +289,8 @@ bool compareObject(Object* lhs, Object* rhs) {
      return false;
 }
 
-Function* makeFunction(Object* (EvalApply::*function)(List*)) {
-    Function* p = new Function;
+Procedure* makeFunction(Object* (EvalApply::*function)(List*)) {
+    Procedure* p = new Procedure;
     p->func = function;
     p->free_vars = new List();
     p->env = nullptr;

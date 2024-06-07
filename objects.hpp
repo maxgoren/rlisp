@@ -57,8 +57,17 @@ Object* makeRealObject(double val) {
     return obj;
 }
 
+Object* makeBoolObject(bool value) {
+    Object* obj = new Object;
+    obj->type = AS_BOOL;
+    obj->boolVal = value;
+    return obj;
+}
+
 Object* makeSymbolObject(string value) {
     Object* obj = new Object;
+    if (value == "true" || value == "false")
+        return makeBoolObject(value == "true");
     obj->type = AS_SYMBOL;
     obj->strVal = new string(value);
     return obj;
@@ -89,13 +98,6 @@ Object* makeErrorObject(string error) {
     Object* obj = new Object;
     obj->type = AS_ERROR;
     obj->strVal = new string(error);
-    return obj;
-}
-
-Object* makeBoolObject(bool value) {
-    Object* obj = new Object;
-    obj->type = AS_BOOL;
-    obj->boolVal = value;
     return obj;
 }
 
