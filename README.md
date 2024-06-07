@@ -25,3 +25,5 @@ Lexical Scoping with 'let'
      mgclisp(8)> y
       ( 9 )
     mgclisp(9)>
+
+Inspired by https://github.com/Jaffe-/lispc
