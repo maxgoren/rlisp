@@ -36,6 +36,7 @@ class Lexer {
     private:
         Buffer buffer;
         Stack<char> parStack;
+        vector<Lexeme> tokens;
         bool is_skip(char c);
         Lexeme extractNumber();
         Lexeme extractWord();
@@ -50,7 +51,7 @@ Lexer::Lexer() {
 }
 
 vector<Lexeme> Lexer::lex(string input) {
-    vector<Lexeme> tokens;
+    tokens.clear();
     parStack.clear();
     buffer.init(input);
     while (!buffer.isEOF()) {
@@ -63,7 +64,8 @@ vector<Lexeme> Lexer::lex(string input) {
             tokens.push_back(extractWord());
         } else {
             tokens.push_back(checkSpecials());
-            buffer.advance();
+            if (tokens.back().token != NUMBER && tokens.back().token != REALNUM)
+                buffer.advance();
         }
     }
     if (!parStack.empty()) {
@@ -115,11 +117,21 @@ Lexeme Lexer::checkSpecials() {
         case ')': 
             if (parStack.empty() || parStack.top() != '(') {
                 cout<<"Error: Mismatched Parentheses!"<<endl;
+                tokens.clear();
                 return Lexeme(ERROR, "Mismatched Parentheses");
             } else {
                 parStack.pop();
             }
             return Lexeme(RPAREN, ")");
+        case '-':
+            buffer.advance();
+            if (isdigit(buffer.getChar())) {
+                Lexeme lexeme = extractNumber();
+                lexeme.strVal = string("-").append(lexeme.strVal);
+                return lexeme;
+            }
+            buffer.reverse();
+            break;
         default:
             break;
     }

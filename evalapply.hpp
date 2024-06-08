@@ -50,6 +50,7 @@ class EvalApply {
         List* environment;
     public:
         EvalApply(bool noisey = false);
+        ~EvalApply();
         Object* eval(List* expression);
         void setTrace(bool trace);
 };
@@ -83,11 +84,12 @@ EvalApply::EvalApply(bool noisey) {
     loud = noisey;
     d = 0;
     environment = new List();
-    numSpecials = 8;
+    numSpecials = 9;
     specialForms = new SpecialForm[numSpecials] {
         {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine},
         {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf},
         {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda},
+        {"\\", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda},
         {"'", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialQuote},
         {"set", 2, {NO_EVAL, EVAL}, &EvalApply::specialSet},
         {"do", 0, {}, &EvalApply::specialDo},
@@ -106,6 +108,10 @@ EvalApply::EvalApply(bool noisey) {
     addPrimitive("car", &EvalApply::primitiveCar);
     addPrimitive("cdr", &EvalApply::primitiveCdr);
     addPrimitive("push", &EvalApply::primitivePush);
+}
+
+EvalApply::~EvalApply() {
+    destroyList(environment);
 }
 
 Object* EvalApply::envLookUp(List* env, Object* obj) {
@@ -149,10 +155,21 @@ Object* EvalApply::specialQuote(List* args, List* env) {
 Object* EvalApply::specialSet(List* args, List* env) {
     Object* symbol = args->first()->info;
     Object* replacement = args->first()->next->info;
-    for (Object* info : *args) {
-        if (compareObject(info->bindingVal->symbol, symbol)) {
-            info->bindingVal->value = replacement;
-            return replacement;
+    for (Object*& info : *args) {
+        if (info != nullptr) {
+            cout<<typeStr[info->type]<<" - '"<<toString(info)<<"' == "<<typeStr[symbol->type]<<" - '"<<toString(symbol)<<"'"<<endl;
+            if (info->type == AS_BINDING) {
+                if (compareObject(info->bindingVal->symbol, symbol)) {
+                    info->bindingVal->value = replacement;
+                    return replacement;
+                }
+            }
+            if (info->type == AS_SYMBOL) {
+                if (compareObject(info, symbol)) {
+                    info->bindingVal->value = replacement;
+                    return replacement;
+                }
+            }
         }
     }
     env->append(makeBindingObject(makeBinding(symbol, replacement)));
@@ -300,21 +317,21 @@ List* EvalApply::makeNewEnvironment(List* vars, List* vals) {
     return nenv;
 }
 
-Object* EvalApply::applySpecial(SpecialForm* special, List* args, List* environment) {
+Object* EvalApply::applySpecial(SpecialForm* special, List* args, List* env) {
     enter();
     ListNode* currArg = args->first();
     List* evaluated_args = new List();
     for (int i = 0; i < args->size(); i++) {
         Object* result = currArg->info;
-        if (special->num_args != 0 && special->flags[i] == EVAL) {
-            result = eval(currArg->info, environment);
+        if (special->numArgs != 0 && special->flags[i] == EVAL) {
+            result = eval(currArg->info, env);
         }
         evaluated_args->append(result);
         currArg = currArg->next;
     }
     auto m = special->func;
     leave();
-    return (this->*m)(evaluated_args, environment);
+    return (this->*m)(evaluated_args, env);
 }
 
 Object* EvalApply::applyMathPrimitive(List* args, string op) {
@@ -341,12 +358,11 @@ Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
         return (this->*m)(args);
     }
     if (proc->type == LAMBDA) {
-        List* nenv = makeNewEnvironment(proc->free_vars, args);
+        List* nenv = makeNewEnvironment(proc->freeVars, args);
         nenv->addMissing(proc->env);
         nenv->addMissing(env);
         Object* result = eval(proc->code, nenv);
         leave();
-        delete nenv;
         return result;
     }
     leave();
@@ -441,8 +457,6 @@ Object* EvalApply::eval(Object* obj, List* env) {
 Object* EvalApply::eval(List* expr) {
     Object* exprObj = makeListObject(expr);
     Object* result = eval(exprObj, environment);
-    destroyList(exprObj->listVal);
-    destroyObject(exprObj);
     return result;
 }
 

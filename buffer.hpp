@@ -41,7 +41,7 @@ char Buffer::advance() {
 }
 
 char Buffer::reverse() {
-    if (inPos-1 > 0) {
+    if (inPos-1 >= 0) {
         inPos--;
     }
     return buffer[inPos];

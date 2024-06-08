@@ -6,7 +6,6 @@ bool compareObject(Object* lhs, Object* rhs);
 
 string toString(Object*);
 
-//The list destructor should free the info object
 struct ListNode {
     Object* info;
     ListNode* next;
@@ -188,8 +187,10 @@ Object* List::pop_front() {
 
 string List::asString() {
     string str = "( ";
-    for (link it = head; it != nullptr; it = it->next)
-        str.append(toString(it->info) + " ");
+    if (size() > 0) {
+        for (link it = head; it != nullptr; it = it->next)
+            str.append(toString(it->info) + " ");
+    }
     str.append(")");
     return str;
 }
@@ -296,7 +297,7 @@ void destroyList(List* list) {
 Procedure* makeFunction(Object* (EvalApply::*function)(List*)) {
     Procedure* p = new Procedure;
     p->func = function;
-    p->free_vars = new List();
+    p->freeVars = new List();
     p->env = nullptr;
     p->type = PRIMITIVE;
     return p; 

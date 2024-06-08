@@ -51,14 +51,14 @@ struct Binding {
 struct Procedure {
     funcType type;
     List* env;
-    List* free_vars;
+    List* freeVars;
     Object* (EvalApply::*func)(List*);
     Object* code;
 };
 
 struct SpecialForm {
     string name;
-    int num_args;
+    int numArgs;
     char flags[3];
     Object* (EvalApply::*func)(List*, List*);
 };
@@ -85,7 +85,7 @@ Procedure* allocFunction(List* vars, Object* code, List* penv, funcType type) {
     p->code = code;
     p->env = penv;
     p->type = type;
-    p->free_vars = vars;
+    p->freeVars = vars;
     return p;
 }
 
@@ -153,9 +153,9 @@ Object* makeErrorObject(string error) {
 }
 
 void destroyList(List* list);
-
+int c = 0;
 void destroyObject(Object* obj) {
-    if (obj != nullptr)
+    if (obj == nullptr)
         return;
     switch (getObjectType(obj)) {
         case AS_BINDING:  
@@ -178,6 +178,7 @@ void destroyObject(Object* obj) {
         default:
             break;
     }
+    c++;
     delete obj;
 }
 
