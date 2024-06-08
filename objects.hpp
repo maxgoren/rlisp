@@ -40,9 +40,6 @@ struct Object {
         Binding* bindingVal;
         Procedure* procedureVal;
     };
-    ~Object() {
-        cout<<"weedbadman, weedcreep, weedicecream, weedtea."<<endl;
-    }
 };
 
 struct Binding {

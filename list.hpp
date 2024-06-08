@@ -93,7 +93,6 @@ List::~List() {
         head = head->next;
         string s = toString(x->info);
         destroyObject(x->info);
-        cout<<"Freed "<<s<<endl;
         delete x;
     }
 }
