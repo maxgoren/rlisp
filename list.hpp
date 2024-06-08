@@ -149,7 +149,7 @@ ListNode* List::getNthNode(int N) {
 }
 
 void List::addMissing(List* list) {
-    for (Object* it : list) {
+    for (Object* it : *list) {
         if (find(it) == -1) {
             append(it);
         }

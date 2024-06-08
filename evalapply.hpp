@@ -275,7 +275,7 @@ Object* EvalApply::primitiveCar(List* args) {
 }
 
 Object* EvalApply::primitiveCdr(List* args) {
-    say("primtiive cdr " + args->asString());
+    say("primitive cdr " + args->asString());
     return makeListObject(args->rest());
 }
 
@@ -333,7 +333,7 @@ Object* EvalApply::applyMathPrimitive(List* args, string op) {
 }
 
 Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
-    enter();
+    enter(); say("apply");
     if (proc->type == PRIMITIVE) {
         say("Applying primitive.");
         auto m = proc->func;
@@ -352,46 +352,44 @@ Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
 }
 
 Object* EvalApply::eval(Object* obj, List* env) {
-    enter();
-    if (obj->type == AS_INT) {
-        say("Evaluated " + toString(obj) + " as int");
-        leave();
-        return obj;
+    enter(); say("eval");
+    switch (getObjectType(obj)) {
+        case AS_INT:
+            say("Evaluated " + toString(obj) + " as int");
+            leave();
+            return obj;
+        case AS_REAL:
+            say("Evaluated " + toString(obj) + " as real");
+            leave();
+            return obj;
+        case AS_BOOL:
+            say("Evaluated " + toString(obj) + " as Bool");
+            leave();
+            return obj;
+        case AS_FUNCTION:
+            say("Evaluated " + toString(obj) + " as function");
+            leave();
+            return obj;
+        case AS_ERROR:
+            say("Evaluated " + toString(obj) + " as Error");
+            leave();
+            return obj;
+        case AS_SYMBOL:
+            Object* ret =  envLookUp(env, obj);
+            say("Evaluated " + toString(ret) + " From Symbol " + toString(obj));
+            leave();
+            return ret;
+        default:
+            break;
     }
-    if (obj->type == AS_REAL) {
-        say("Evaluated " + toString(obj) + " as real");
-        leave();
-        return obj;
-    }
-    if (obj->type == AS_BOOL) {
-        say("Evaluated " + toString(obj) + " as Bool");
-        leave();
-        return obj;
-    }
-    if (obj->type == AS_FUNCTION) {
-        say("Evaluated " + toString(obj) + " as function");
-        leave();
-        return obj;
-    }
-    if (obj->type == AS_ERROR) {
-        say("Evaluated " + toString(obj) + " as Error");
-        leave();
-        return obj;
-    }
-    if (obj->type == AS_SYMBOL) {
-        Object* ret =  envLookUp(env, obj);
-        say("Evaluated " + toString(ret) + " From Symbol " + toString(obj));
-        leave();
-        return ret;
-    }
-    if (obj->type == AS_LIST) {
+    if (getObjectType(obj) == AS_LIST) {
         say("Evaluated " + toString(obj) + " as List");
         List* list = obj->listVal;
         if (list->empty()) {
             leave();
             return obj;
         }
-        if (list->first()->info->type == AS_SYMBOL) {
+        if (getObjectType(list->first()->info) == AS_SYMBOL) {
             string sym = *list->first()->info->strVal;
             for (int i = 0; i < num_operators; i++) {
                 if (sym == specialForms[i].name) {
@@ -408,7 +406,7 @@ Object* EvalApply::eval(Object* obj, List* env) {
             Object* el = eval(curr, env);
             evaluated_args->append(el);
         }
-        if (evaluated_args->first()->info->type == AS_FUNCTION)  {
+        if (getObjectType(evaluated_args->first()->info) == AS_FUNCTION)  {
             List* arguments = evaluated_args->rest();
             say("Applying function");
             leave();

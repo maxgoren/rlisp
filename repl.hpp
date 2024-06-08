@@ -28,11 +28,11 @@ void REPL::start() {
     bool running = true;
     int exprNo = 1;
     bool tracing = false;
-    char* buff;
-    while (running) {
+     while (running) {
         string prompt = "mgclisp(" + to_string(exprNo) + ")> ";
+        //If you dont want to use GNU readline, replace the following line
+        //with getline(cin, input);
         input = readline(prompt.c_str());
-        //getline(cin, input);
         if (input.empty())
             continue;
         if (input == "quit") {
