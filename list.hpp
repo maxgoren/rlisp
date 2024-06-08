@@ -6,6 +6,7 @@ bool compareObject(Object* lhs, Object* rhs);
 
 string toString(Object*);
 
+//The list destructor should free the info object
 struct ListNode {
     Object* info;
     ListNode* next;
@@ -54,23 +55,22 @@ class List {
         int size();
         void append(Object* obj);
         void push(Object* obj);
-        ListNode* first();
-        List* rest();
+        List* copy();
+        List* copyOmitNth(int N);
         int find(Object* obj);
         link getNthNode(int N);
         void addMissing(List* list);
         void deleteNth(int N);
         Object* pop_front();
-        void print();
-        string asString();
-        List* copy();
-        List* copyOmitNth(int N);
         void clear();
-        List& operator=(const List& list);
         ListIterator begin();
         ListIterator end();
         ListIterator begin() const;
         ListIterator end() const;
+        ListNode* first();
+        string asString();
+        List* rest();
+        List& operator=(const List& list);
 };
 
 List::List() {
@@ -91,6 +91,9 @@ List::~List() {
     while (head != nullptr) {
         link x = head;
         head = head->next;
+        string s = toString(x->info);
+        destroyObject(x->info);
+        cout<<"Freed "<<s<<endl;
         delete x;
     }
 }
@@ -182,10 +185,6 @@ Object* List::pop_front() {
     count--;
     delete t;
     return ret;
-}
-
-void List::print() {
-    cout<<asString()<<endl;
 }
 
 string List::asString() {
@@ -287,6 +286,12 @@ bool compareObject(Object* lhs, Object* rhs) {
             break;
      }
      return false;
+}
+
+void destroyList(List* list) {
+    if (list != nullptr) {
+        delete list;
+    }
 }
 
 Procedure* makeFunction(Object* (EvalApply::*function)(List*)) {

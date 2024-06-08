@@ -66,6 +66,11 @@ vector<Lexeme> Lexer::lex(string input) {
             buffer.advance();
         }
     }
+    if (!parStack.empty()) {
+        cout<<"Error: Mismatched Parentheses!"<<endl;
+        tokens.clear();
+        tokens.push_back(Lexeme(ERROR, "Mismatched Parentheses"));
+    }
     return tokens;
 }
 

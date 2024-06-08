@@ -40,6 +40,9 @@ struct Object {
         Binding* bindingVal;
         Procedure* procedureVal;
     };
+    ~Object() {
+        cout<<"weedbadman, weedcreep, weedicecream, weedtea."<<endl;
+    }
 };
 
 struct Binding {
@@ -69,6 +72,15 @@ objType getObjectType(Object* obj) {
 
 Binding* makeBinding(Object* symbol, Object* value) {
     return new Binding(symbol, value);
+}
+
+void destroyObject(Object* obj);
+
+void destoryBinding(Binding* binding) {
+    if (binding != nullptr) {
+        destroyObject(binding->symbol);
+        destroyObject(binding->value);
+    }
 }
 
 Procedure* allocFunction(List* vars, Object* code, List* penv, funcType type) {
@@ -141,6 +153,35 @@ Object* makeErrorObject(string error) {
     obj->type = AS_ERROR;
     obj->strVal = new string(error);
     return obj;
+}
+
+void destroyList(List* list);
+
+void destroyObject(Object* obj) {
+    if (obj != nullptr)
+        return;
+    switch (getObjectType(obj)) {
+        case AS_BINDING:  
+            destoryBinding(obj->bindingVal);
+            break;
+        case AS_FUNCTION: 
+            if (obj->procedureVal != nullptr)
+                delete obj->procedureVal;
+            break;
+        case AS_LIST:     
+            destroyList(obj->listVal);
+            break;
+        case AS_ERROR:
+        case AS_SYMBOL:   
+            if (obj->strVal != nullptr)
+                delete obj->strVal;
+        case AS_INT: 
+        case AS_REAL: 
+        case AS_BOOL: 
+        default:
+            break;
+    }
+    delete obj;
 }
 
 #endif

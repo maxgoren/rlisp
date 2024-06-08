@@ -15,7 +15,7 @@ class EvalApply {
         void enter();
         void leave();
         void say(string s);
-        int num_operators;
+        int numSpecials;
         SpecialForm* specialForms;
 
         Object* specialDefine(List* args, List* env);
@@ -83,8 +83,8 @@ EvalApply::EvalApply(bool noisey) {
     loud = noisey;
     d = 0;
     environment = new List();
-    num_operators = 8;
-    specialForms = new SpecialForm[num_operators] {
+    numSpecials = 8;
+    specialForms = new SpecialForm[numSpecials] {
         {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine},
         {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf},
         {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda},
@@ -344,8 +344,10 @@ Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
         List* nenv = makeNewEnvironment(proc->free_vars, args);
         nenv->addMissing(proc->env);
         nenv->addMissing(env);
+        Object* result = eval(proc->code, nenv);
         leave();
-        return eval(proc->code, nenv);
+        delete nenv;
+        return result;
     }
     leave();
     return makeErrorObject("An error in apply occured");
@@ -374,11 +376,12 @@ Object* EvalApply::eval(Object* obj, List* env) {
             say("Evaluated " + toString(obj) + " as Error");
             leave();
             return obj;
-        case AS_SYMBOL:
+        case AS_SYMBOL: {
             Object* ret =  envLookUp(env, obj);
             say("Evaluated " + toString(ret) + " From Symbol " + toString(obj));
             leave();
             return ret;
+        }
         default:
             break;
     }
@@ -391,7 +394,7 @@ Object* EvalApply::eval(Object* obj, List* env) {
         }
         if (getObjectType(list->first()->info) == AS_SYMBOL) {
             string sym = *list->first()->info->strVal;
-            for (int i = 0; i < num_operators; i++) {
+            for (int i = 0; i < numSpecials; i++) {
                 if (sym == specialForms[i].name) {
                     List* arguments = list->rest();
                     say("Applying Special Form: " + specialForms[i].name);
@@ -436,7 +439,11 @@ Object* EvalApply::eval(Object* obj, List* env) {
 */
 
 Object* EvalApply::eval(List* expr) {
-    return eval(makeListObject(expr), environment);
+    Object* exprObj = makeListObject(expr);
+    Object* result = eval(exprObj, environment);
+    destroyList(exprObj->listVal);
+    destroyObject(exprObj);
+    return result;
 }
 
 #endif
