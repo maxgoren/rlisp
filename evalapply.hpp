@@ -41,6 +41,7 @@ class EvalApply {
         Object* applySpecial(SpecialForm* special, List* args, List* environment);
         Object* applyMathPrimitive(List* args, string op);
         Object* apply(Procedure* proc, List* args, List* env);
+        Object* evalList(List* list, List* env);
         Object* eval(Object* obj, List* env);
 
         List* makeNewEnvironment(List* vars, List* vals);
@@ -155,20 +156,11 @@ Object* EvalApply::specialQuote(List* args, List* env) {
 Object* EvalApply::specialSet(List* args, List* env) {
     Object* symbol = args->first()->info;
     Object* replacement = args->first()->next->info;
-    for (Object*& info : *args) {
-        if (info != nullptr) {
-            cout<<typeStr[info->type]<<" - '"<<toString(info)<<"' == "<<typeStr[symbol->type]<<" - '"<<toString(symbol)<<"'"<<endl;
-            if (info->type == AS_BINDING) {
-                if (compareObject(info->bindingVal->symbol, symbol)) {
-                    info->bindingVal->value = replacement;
-                    return replacement;
-                }
-            }
-            if (info->type == AS_SYMBOL) {
-                if (compareObject(info, symbol)) {
-                    info->bindingVal->value = replacement;
-                    return replacement;
-                }
+    for (Object* curr : *env) {
+        if (curr->type == AS_BINDING) {
+            if (compareObject(curr->bindingVal->symbol, symbol)) {
+                curr->bindingVal->value = replacement;
+                return replacement;
             }
         }
     }
@@ -349,6 +341,34 @@ Object* EvalApply::applyMathPrimitive(List* args, string op) {
     return makeRealObject(result);
 }
 
+Object* EvalApply::evalList(List* list, List* env) {
+    if (getObjectType(list->first()->info) == AS_SYMBOL) {
+        string sym = *list->first()->info->strVal;
+        for (int i = 0; i < numSpecials; i++) {
+            if (sym == specialForms[i].name) {
+                List* arguments = list->rest();
+                say("Applying Special Form: " + specialForms[i].name);
+                leave();
+                return applySpecial(&specialForms[i], arguments, env);
+            }
+        }
+    }
+    List* evaluatedArguments = new List();
+    say("Evaluating Arguments");
+    for (Object* curr : *list) {
+        Object* el = eval(curr, env);
+        evaluatedArguments->append(el);
+    }
+    if (getObjectType(evaluatedArguments->first()->info) == AS_FUNCTION)  {
+        List* arguments = evaluatedArguments->rest();
+        say("Applying function");
+        leave();
+        return apply(evaluatedArguments->first()->info->procedureVal, arguments, env);
+    }
+    leave();
+    return makeListObject(evaluatedArguments);
+}
+
 Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
     enter(); say("apply");
     if (proc->type == PRIMITIVE) {
@@ -398,41 +418,15 @@ Object* EvalApply::eval(Object* obj, List* env) {
             leave();
             return ret;
         }
+        case AS_LIST: 
+            say("Evaluated " + toString(obj) + " as List");
+            if (obj->listVal->empty()) {
+                leave();
+                return obj;
+            }
+            return evalList(obj->listVal, env);
         default:
             break;
-    }
-    if (getObjectType(obj) == AS_LIST) {
-        say("Evaluated " + toString(obj) + " as List");
-        List* list = obj->listVal;
-        if (list->empty()) {
-            leave();
-            return obj;
-        }
-        if (getObjectType(list->first()->info) == AS_SYMBOL) {
-            string sym = *list->first()->info->strVal;
-            for (int i = 0; i < numSpecials; i++) {
-                if (sym == specialForms[i].name) {
-                    List* arguments = list->rest();
-                    say("Applying Special Form: " + specialForms[i].name);
-                    leave();
-                    return applySpecial(&specialForms[i], arguments, env);
-                }
-            }
-        }
-        List* evaluated_args = new List();
-        say("Evaluating Arguments");
-        for (Object* curr : *list) {
-            Object* el = eval(curr, env);
-            evaluated_args->append(el);
-        }
-        if (getObjectType(evaluated_args->first()->info) == AS_FUNCTION)  {
-            List* arguments = evaluated_args->rest();
-            say("Applying function");
-            leave();
-            return apply(evaluated_args->first()->info->procedureVal, arguments, env);
-        }
-        leave();
-        return makeListObject(evaluated_args);
     }
     return makeErrorObject("Error during eval");
 }

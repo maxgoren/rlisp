@@ -20,7 +20,7 @@ class REPL {
 };
 
 REPL::REPL() {
-    cout<<"[mgclisp2]"<<endl;
+    cout<<"[mgclisp repl]"<<endl;
 }
 
 void REPL::start() {
@@ -51,7 +51,9 @@ void REPL::start() {
 
 List* REPL::parseToList(vector<Lexeme>& lexemes, int& index) {
     List* result = new List();
+    bool shouldQuote = false;
     if (lexemes[index].token == LPAREN) index++;
+    else shouldQuote = true;
     for (; index < lexemes.size(); index++) {
         switch (lexemes[index].token) {
             case LPAREN: 
@@ -69,6 +71,12 @@ List* REPL::parseToList(vector<Lexeme>& lexemes, int& index) {
                 result->append(makeRealObject(stof(lexemes[index].strVal.c_str())));
                 break;
         }
+    }
+    if (shouldQuote) {
+        List* nr = new List();
+        nr->append(makeSymbolObject("'"));
+        nr->append(makeListObject(result));
+        result = nr;
     }
     return result;
 }
