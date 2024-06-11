@@ -284,13 +284,17 @@ Object* EvalApply::primitivePrint(List* args) {
     return new Object();
 }
 Object* EvalApply::primitiveCar(List* args) {
-    say("primitive car " + args->asString());
-    return args->first()->info;
+    say("primitive car " + toString(args->first()->info));
+    if (getObjectType(args->first()->info) != AS_LIST)
+        return makeErrorObject("Error: car must be supplied a list");
+    return args->first()->info->listVal->first()->info;
 }
 
 Object* EvalApply::primitiveCdr(List* args) {
-    say("primitive cdr " + args->asString());
-    return makeListObject(args->rest());
+    say("primitive cdr " + toString(args->first()->info));
+    if (getObjectType(args->first()->info) != AS_LIST)
+        return makeErrorObject("Error: cdr must be supplied a list");
+    return makeListObject(args->first()->info->listVal->rest());
 }
 
 Object* EvalApply::primitivePush(List* args) {
