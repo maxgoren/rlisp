@@ -1,8 +1,6 @@
 #ifndef lisp_objects_hpp
 #define lisp_objects_hpp
 #include <iostream>
-#include <vector>
-#include <stack>
 #include <cmath>
 using namespace std;
 
@@ -153,7 +151,6 @@ Object* makeErrorObject(string error) {
 }
 
 void destroyList(List* list);
-int c = 0;
 void destroyObject(Object* obj) {
     if (obj == nullptr)
         return;
@@ -178,7 +175,6 @@ void destroyObject(Object* obj) {
         default:
             break;
     }
-    c++;
     delete obj;
 }
 

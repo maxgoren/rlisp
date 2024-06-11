@@ -2,7 +2,6 @@
 #define repl_hpp
 #include <iostream>
 #include <vector>
-#include <stack>
 #include "objects.hpp"
 #include "lex.hpp"
 #include "evalapply.hpp"
@@ -11,9 +10,9 @@ using namespace std;
 
 class REPL {
     private:
-        List* parseToList(vector<Lexeme>& lexemes, int& index);
         Lexer lexer;
         EvalApply evaluator;
+        List* parseToList(vector<Lexeme>& lexemes, int& index);
     public:
         REPL();
         void start();

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <stack>
+#include <unordered_map>
 #include "objects.hpp"
 #include "lex.hpp"
 #include "list.hpp"
@@ -13,11 +14,11 @@ class EvalApply {
         bool loud;
         int d;
         void enter();
+        void enter(string s);
         void leave();
+        void leave(string s);
         void say(string s);
-        int numSpecials;
-        SpecialForm* specialForms;
-
+        unordered_map<string, SpecialForm> specialForms;
         Object* specialDefine(List* args, List* env);
         Object* specialIf(List* args, List* env);
         Object* specialLambda(List* args, List* env);
@@ -73,6 +74,14 @@ void EvalApply::enter() {
 void EvalApply::leave() {
     d--;
 }
+void EvalApply::enter(string s) {
+    d++;
+    say(s);
+}
+void EvalApply::leave(string s) {
+    say(s);
+    d--;
+}
 
 void EvalApply::addBinding(Binding* binding) {
     environment->append(makeBindingObject(binding));
@@ -85,19 +94,16 @@ EvalApply::EvalApply(bool noisey) {
     loud = noisey;
     d = 0;
     environment = new List();
-    numSpecials = 9;
-    specialForms = new SpecialForm[numSpecials] {
-        {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine},
-        {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf},
-        {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda},
-        {"\\", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda},
-        {"'", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialQuote},
-        {"set", 2, {NO_EVAL, EVAL}, &EvalApply::specialSet},
-        {"do", 0, {}, &EvalApply::specialDo},
-        {"cond", 0, {}, &EvalApply::specialCond},
-        {"let",2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLet}
-    };
-
+    specialForms["define"] = {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine};
+    specialForms["if"] = {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf};
+    specialForms["lambda"] = {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda};
+    specialForms["\\"] = {"\\", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda};
+    specialForms["'"] = {"'", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialQuote};
+    specialForms["set"] = {"set", 2, {NO_EVAL, EVAL}, &EvalApply::specialSet};
+    specialForms["do"] = {"do", 0, {}, &EvalApply::specialDo};
+    specialForms["cond"] = {"cond", 0, {}, &EvalApply::specialCond};
+    specialForms["let"] = {"let",2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLet};
+    
     addPrimitive("+", &EvalApply::primitivePlus);
     addPrimitive("-", &EvalApply::primitiveMinus);
     addPrimitive("/", &EvalApply::primitiveDivide);
@@ -201,13 +207,12 @@ Object* EvalApply::specialLet(List* args, List* env) {
     List* var_vals = new List();
     for (Object* info : *vars) {
         if (info->type == AS_LIST) {
-        var_names->append(makeSymbolObject(*info->listVal->first()->info->strVal));
-        var_vals->append(info->listVal->first()->next->info);
+            var_names->append(makeSymbolObject(*info->listVal->first()->info->strVal));
+            var_vals->append(info->listVal->first()->next->info);
         } else {
             return makeErrorObject("Let requires its own association list");
         }
     }
-    
     Procedure* tempfunc = allocFunction(var_names, makeListObject(body), env, LAMBDA);
     List* asList = new List();
     asList->append(makeFunctionObject(tempfunc));
@@ -343,38 +348,33 @@ Object* EvalApply::applyMathPrimitive(List* args, string op) {
 
 Object* EvalApply::evalList(List* list, List* env) {
     if (getObjectType(list->first()->info) == AS_SYMBOL) {
-        string sym = *list->first()->info->strVal;
-        for (int i = 0; i < numSpecials; i++) {
-            if (sym == specialForms[i].name) {
-                List* arguments = list->rest();
-                say("Applying Special Form: " + specialForms[i].name);
-                leave();
-                return applySpecial(&specialForms[i], arguments, env);
-            }
+        string symbol = *list->first()->info->strVal;
+        if (specialForms.find(symbol) != specialForms.end()) {
+            List* arguments = list->rest();
+            leave("Evaluated as Special Form: " + symbol);
+            return applySpecial(&specialForms[symbol], arguments, env);
         }
     }
     List* evaluatedArguments = new List();
     say("Evaluating Arguments");
     for (Object* curr : *list) {
-        Object* el = eval(curr, env);
-        evaluatedArguments->append(el);
+        evaluatedArguments->append(eval(curr, env));
     }
     if (getObjectType(evaluatedArguments->first()->info) == AS_FUNCTION)  {
+        Procedure* procedure = evaluatedArguments->first()->info->procedureVal;
         List* arguments = evaluatedArguments->rest();
-        say("Applying function");
-        leave();
-        return apply(evaluatedArguments->first()->info->procedureVal, arguments, env);
+        leave("Evaluated as function expression");
+        return apply(procedure, arguments, env);
     }
-    leave();
+    leave("Evaluated As List");
     return makeListObject(evaluatedArguments);
 }
 
 Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
-    enter(); say("apply");
+    enter("apply");
     if (proc->type == PRIMITIVE) {
-        say("Applying primitive.");
         auto m = proc->func;
-        leave();
+        leave("Applying primitive.");
         return (this->*m)(args);
     }
     if (proc->type == LAMBDA) {
@@ -390,38 +390,31 @@ Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
 }
 
 Object* EvalApply::eval(Object* obj, List* env) {
-    enter(); say("eval");
+    enter("eval");
     switch (getObjectType(obj)) {
         case AS_INT:
-            say("Evaluated " + toString(obj) + " as int");
-            leave();
+            leave("Evaluated " + toString(obj) + " as int");
             return obj;
         case AS_REAL:
-            say("Evaluated " + toString(obj) + " as real");
-            leave();
+            leave("Evaluated " + toString(obj) + " as real");
             return obj;
         case AS_BOOL:
-            say("Evaluated " + toString(obj) + " as Bool");
-            leave();
+            leave("Evaluated " + toString(obj) + " as Bool");
             return obj;
         case AS_FUNCTION:
-            say("Evaluated " + toString(obj) + " as function");
-            leave();
+            leave("Evaluated " + toString(obj) + " as function");
             return obj;
         case AS_ERROR:
-            say("Evaluated " + toString(obj) + " as Error");
-            leave();
+            leave("Evaluated " + toString(obj) + " as Error");
             return obj;
         case AS_SYMBOL: {
             Object* ret =  envLookUp(env, obj);
-            say("Evaluated " + toString(ret) + " From Symbol " + toString(obj));
-            leave();
+            leave("Evaluated " + toString(ret) + " From Symbol " + toString(obj));
             return ret;
         }
         case AS_LIST: 
-            say("Evaluated " + toString(obj) + " as List");
             if (obj->listVal->empty()) {
-                leave();
+                leave("evaluated as ()");
                 return obj;
             }
             return evalList(obj->listVal, env);
