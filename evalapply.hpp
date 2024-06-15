@@ -38,7 +38,7 @@ class EvalApply {
         Object* primitiveCar(List* args);
         Object* primitiveCdr(List* args);
         Object* primitivePush(List* args);
-
+        Object* primitiveList(List* args);
         Object* applySpecial(SpecialForm* special, List* args, List* environment);
         Object* applyMathPrimitive(List* args, string op);
         Object* apply(Procedure* proc, List* args, List* env);
@@ -93,7 +93,6 @@ void EvalApply::addPrimitive(string symbol, Object* (EvalApply::*func)(List*)) {
 EvalApply::EvalApply(bool noisey) {
     loud = noisey;
     d = 0;
-    environment = new List();
     specialForms["define"] = {"define", 2, {NO_EVAL, EVAL}, &EvalApply::specialDefine};
     specialForms["if"] = {"if", 3, {EVAL, NO_EVAL, NO_EVAL}, &EvalApply::specialIf};
     specialForms["lambda"] = {"lambda", 2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLambda};
@@ -104,6 +103,7 @@ EvalApply::EvalApply(bool noisey) {
     specialForms["cond"] = {"cond", 0, {}, &EvalApply::specialCond};
     specialForms["let"] = {"let",2, {NO_EVAL, NO_EVAL}, &EvalApply::specialLet};
     
+    environment = new List();
     addPrimitive("+", &EvalApply::primitivePlus);
     addPrimitive("-", &EvalApply::primitiveMinus);
     addPrimitive("/", &EvalApply::primitiveDivide);
@@ -115,6 +115,7 @@ EvalApply::EvalApply(bool noisey) {
     addPrimitive("car", &EvalApply::primitiveCar);
     addPrimitive("cdr", &EvalApply::primitiveCdr);
     addPrimitive("push", &EvalApply::primitivePush);
+    addPrimitive("list", &EvalApply::primitiveList);
 }
 
 EvalApply::~EvalApply() {
@@ -306,6 +307,11 @@ Object* EvalApply::primitivePush(List* args) {
     addTo->push(toPush);
     return makeListObject(addTo);
 }
+
+Object* EvalApply::primitiveList(List* args) {
+    return makeListObject(args);
+}
+
 List* EvalApply::makeNewEnvironment(List* vars, List* vals) {
     List* nenv = new List();
     ListNode* currVar = vars->first();
@@ -330,9 +336,9 @@ Object* EvalApply::applySpecial(SpecialForm* special, List* args, List* env) {
         evaluated_args->append(result);
         currArg = currArg->next;
     }
-    auto m = special->func;
+    auto func = special->func;
     leave();
-    return (this->*m)(evaluated_args, env);
+    return (this->*func)(evaluated_args, env);
 }
 
 Object* EvalApply::applyMathPrimitive(List* args, string op) {
@@ -374,18 +380,18 @@ Object* EvalApply::evalList(List* list, List* env) {
     return makeListObject(evaluatedArguments);
 }
 
-Object* EvalApply::apply(Procedure* proc, List* args, List* env) {
+Object* EvalApply::apply(Procedure* procedure, List* args, List* env) {
     enter("apply");
-    if (proc->type == PRIMITIVE) {
-        auto m = proc->func;
+    if (procedure->type == PRIMITIVE) {
+        auto func = procedure->func;
         leave("Applying primitive.");
-        return (this->*m)(args);
+        return (this->*func)(args);
     }
-    if (proc->type == LAMBDA) {
-        List* nenv = makeNewEnvironment(proc->freeVars, args);
-        nenv->addMissing(proc->env);
+    if (procedure->type == LAMBDA) {
+        List* nenv = makeNewEnvironment(procedure->freeVars, args);
+        nenv->addMissing(procedure->env);
         nenv->addMissing(env);
-        Object* result = eval(proc->code, nenv);
+        Object* result = eval(procedure->code, nenv);
         leave();
         return result;
     }
